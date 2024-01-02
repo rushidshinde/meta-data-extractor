@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webpage Data Extractor</title>
+</head>
+<body>
+
+    <h1>Webpage Data Extractor</h1>
+
+    <input type="file" id="csvFileInput" accept=".csv">
+    <button onclick="processCSV()">Process CSV</button>
+    <p id="loadingText" style="display: none;">Loading...</p>
+
+    <script>
+        async function processCSV() {
+            const input = document.getElementById('csvFileInput');
+            const file = input.files[0];
+            const loadingText = document.getElementById('loadingText');
+
+            if (file) {
+                loadingText.style.display = 'block';
+
+                const reader = new FileReader();
+
+                reader.onload = async function (e) {
+                    const csvData = e.target.result.split('\n');
+                    const extractedData = [];
+
+                    // Process each website link
+                    const fetchDataPromises = csvData.map(async function (link) {
+                        if (link.trim() !== '') {
+                            const response = await fetch(link);
+                            const htmlContent = await response.text();
+
+                            // Extract meta title, meta description, h1, h2, h3, h4
+                            const title = htmlContent.match(/<title>(.*?)<\/title>/i);
+                            const metaDescription = htmlContent.match(/<meta name="description" content="(.*?)"/i);
+                            const headings = htmlContent.match(/<h[1-4]>(.*?)<\/h[1-4]>/gi);
+
+                            // Prepare data row for CSV
+                            const rowData = [link, title ? title[1] : '', metaDescription ? metaDescription[1] : ''];
+                            if (headings) {
+                                headings.forEach(function (heading, index) {
+                                    rowData.push(heading.replace(/<\/?[^>]+(>|$)/g, ''));
+                                });
+                            }
+
+                            extractedData.push(rowData.join(','));
+                        }
+                    });
+
+                    // Wait for all fetch operations to complete
+                    await Promise.all(fetchDataPromises);
+
+                    // Create a new CSV file with extracted data
+                    const csvContent = extractedData.join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'extracted_data.csv';
+                    link.click();
+
+                    loadingText.style.display = 'none';
+                };
+
+                reader.readAsText(file);
+            } else {
+                alert('Please select a CSV file.');
+            }
+        }
+    </script>
+
+</body>
+</html>
